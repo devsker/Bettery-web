@@ -1,13 +1,15 @@
 import { createSignal, Show, For, createMemo } from "solid-js";
 import { Dialog } from "@kobalte/core/dialog";
-import { 
-  ArrowRight, 
-  Download, 
-  ChevronLeft, 
-  Heart, 
-  Coffee, 
+import {
+  ArrowRight,
+  Download,
+  ChevronLeft,
+  Heart,
+  Coffee,
   CircleDollarSign,
-  Star
+  Star,
+  Copy,
+  Check
 } from "lucide-solid";
 
 export interface Binary {
@@ -24,7 +26,7 @@ interface PwywDialogProps {
   projectName?: string;
 }
 
-type Stage = "amount" | "payment" | "format";
+type Stage = "amount" | "payment" | "format" | "downloaded";
 
 export function PwywDialog(props: PwywDialogProps) {
   const [stage, setStage] = createSignal<Stage>("amount");
@@ -58,12 +60,16 @@ export function PwywDialog(props: PwywDialogProps) {
     }
   };
 
+  const triggerDownload = (url: string) => {
+    window.location.href = url;
+    setStage("downloaded");
+  };
+
   const handleContinue = () => {
     const val = currentAmount();
     if (val === 0) {
       if (props.binaries.length === 1) {
-        window.location.href = props.binaries[0].browser_download_url;
-        props.onOpenChange(false);
+        triggerDownload(props.binaries[0].browser_download_url);
       } else {
         setStage("format");
       }
@@ -76,19 +82,26 @@ export function PwywDialog(props: PwywDialogProps) {
     if (props.paypalUrl) {
       window.open(props.paypalUrl, "_blank");
     }
-    
     if (props.binaries.length === 1) {
-      window.location.href = props.binaries[0].browser_download_url;
-      props.onOpenChange(false);
+      triggerDownload(props.binaries[0].browser_download_url);
     } else {
       setStage("format");
     }
+  };
+
+  const [copied, setCopied] = createSignal(false);
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const reset = () => {
     setStage("amount");
     setAmount(null);
     setCustomAmount("");
+    setCopied(false);
   };
 
   return (
@@ -223,8 +236,8 @@ export function PwywDialog(props: PwywDialogProps) {
                       {(binary) => (
                         <a
                           href={binary.browser_download_url}
-                          onClick={() => props.onOpenChange(false)}
-                          class="flex items-center justify-between px-5 py-4 rounded-xl border border-neutral-100 dark:border-neutral-900 hover:border-neutral-800 dark:hover:border-neutral-50 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-all group"
+                          onClick={(e) => { e.preventDefault(); triggerDownload(binary.browser_download_url); }}
+                          class="flex items-center justify-between px-5 py-4 rounded-xl border border-neutral-100 dark:border-neutral-900 hover:border-neutral-800 dark:hover:border-neutral-50 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-all group cursor-pointer"
                         >
                           <div class="flex items-center gap-4">
                             <div class={`p-2 rounded-lg ${binary.is_recommended ? 'bg-neutral-800 dark:bg-neutral-50 text-white dark:text-neutral-900' : 'bg-neutral-50 dark:bg-neutral-900 text-neutral-400'}`}>
@@ -247,8 +260,41 @@ export function PwywDialog(props: PwywDialogProps) {
                   </div>
                 </div>
               </Show>
+              <Show when={stage() === "downloaded"}>
+                <div class="flex flex-col gap-8">
+                  <div class="space-y-1.5">
+                    <Dialog.Title class="text-xl font-semibold tracking-tight text-neutral-800 dark:text-neutral-50">
+                      Download started
+                    </Dialog.Title>
+                    <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                      If macOS blocks the app, run this in Terminal:
+                    </p>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-900 rounded-xl border border-neutral-100 dark:border-neutral-900">
+                    <code class="text-xs font-mono text-neutral-700 dark:text-neutral-300 truncate">
+                      xattr -cr ~/Downloads/{props.projectName || "Bettery"}.app
+                    </code>
+                    <button
+                      onClick={() => handleCopy(`xattr -cr ~/Downloads/${props.projectName || "Bettery"}.app`)}
+                      class="shrink-0 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-50 transition-colors"
+                    >
+                      <Show when={copied()} fallback={<Copy size={14} />}>
+                        <Check size={14} class="text-green-500" />
+                      </Show>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => { reset(); props.onOpenChange(false); }}
+                    class="w-full px-6 py-2.5 rounded-full bg-neutral-800 dark:bg-gray-50 text-white dark:text-gray-900 text-sm font-semibold hover:bg-neutral-700 dark:hover:bg-neutral-200 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </Show>
             </div>
-            
+
             <Dialog.CloseButton class="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </Dialog.CloseButton>
